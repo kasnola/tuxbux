@@ -1,0 +1,44 @@
+# https://textual.textualize.io/guide/styles/
+
+Screen {
+  layout: horizontal;
+}
+
+.box {
+  height: 100%;
+  width: 1fr;
+  border: solid green;
+}
+
+.Purchasable {
+  height: 7;
+  background: $boost;
+  margin: 1;
+  padding: 0;
+  align-vertical: middle;
+  .button 
+}
+
+.PurchasableLabel {
+  height: 100%;
+  width: 80%;
+  border: solid green;
+  align: center top;
+}
+
+.PurchasableButton {
+  /* margin: 2; */
+  # border: green;
+}
+
+#tuxminer {
+}
+
+#buy {
+  # width: 20%;
+  height: 80%;
+  margin: 0;
+  text-align: center;
+  # dock: right;
+  content-align: right middle;
+}
