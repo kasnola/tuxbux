@@ -11,12 +11,12 @@ class Shop(VerticalScroll):
 
 	def compose(self) -> ComposeResult:
 		"""Create child purchasables."""
-		yield Purchasable(name="Product 00", classes="Purchasable")
-		yield Purchasable(name="Product 01", classes="Purchasable")
-		yield Purchasable(name="Product 02", classes="Purchasable")
-		yield Purchasable(name="Product 03", classes="Purchasable")
-		yield Purchasable(name="Product 04", classes="Purchasable")
-		yield Purchasable(name="Product 05", classes="Purchasable")
+		yield Purchasable(name="Product 00", classes="purchasable")
+		yield Purchasable(name="Product 01", classes="purchasable")
+		yield Purchasable(name="Product 02", classes="purchasable")
+		yield Purchasable(name="Product 03", classes="purchasable")
+		yield Purchasable(name="Product 04", classes="purchasable")
+		yield Purchasable(name="Product 05", classes="purchasable")
 
 class Purchasable(HorizontalGroup):
 	"""A purchasable widget."""
@@ -30,14 +30,14 @@ class Purchasable(HorizontalGroup):
 		"""Create child widgets of a purchasable."""
 		yield VerticalGroup(
 			Label("[bold]TuxMiner[/bold]", id="tuxminer"),
-			classes="PurchasableLabel"
+			classes="label"
 		)
 		yield Middle(Button("Buy", classes="button buy"))
 
-class TuxIdleGameApp(App):
+class TuxbuxIdleGameApp(App):
 	"""An idle game made with Textual."""
 
-	CSS_PATH = "terminalidlegame.tcss"
+	CSS_PATH = "tuxbux.tcss"
 	TITLE = "Tuxbux"
 	SUB_TITLE = "An idle game in your terminal"
 
@@ -51,7 +51,7 @@ class TuxIdleGameApp(App):
 		yield Footer()
 		yield Static("Tuxbux", classes="box")
 		yield Static("Hax0r Display", classes="box")
-		yield Shop(classes="box shop")
+		yield Shop(classes="box", id="shop")
 
 	def action_toggle_dark(self) -> None:
 		"""An action to toggle dark mode."""
@@ -60,5 +60,5 @@ class TuxIdleGameApp(App):
 		)
 
 if __name__ == "__main__":
-	app = TuxIdleGameApp()
+	app = TuxbuxIdleGameApp()
 	app.run()
