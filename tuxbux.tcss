@@ -19,13 +19,14 @@ Screen {
 	margin: 1;
 	padding: 0;
 	align-vertical: middle;
+	border: outer cadetblue;
 	.label {
 		height: 100%;
 		width: 80%;
 		align: left top;
 	}
 	.button {
-		height: 80%;
+		height: 100%;
 		text-align: center;
 		content-align: right middle;
 		&.buy {
