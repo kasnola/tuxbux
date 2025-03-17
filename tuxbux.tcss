@@ -8,9 +8,29 @@ Screen {
 	height: 100%;
 	width: 1fr;
 	border: solid green;
-	&#shop {
-		border: solid red;
+	&.shop {
+		border: solid yellow;
+		border: none;
+		#label {
+			# border: solid yellow;
+			# border: none;
+			# margin: 0;
+			height: 8;
+			width: 100%;
+			text-align: center;
+		}
+		#shop {
+			border: solid yellow;
+			# border: none;
+		}
+		#rule {
+			color: yellow;
+		}
 	}
+}
+
+#spidspod {
+	border: solid red;
 }
 
 .purchasable {

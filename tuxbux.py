@@ -5,7 +5,7 @@ from textual.app import App, ComposeResult
 from textual.content import Content
 from textual.containers import Middle, HorizontalGroup, VerticalGroup, VerticalScroll, Center
 from textual.reactive import reactive
-from textual.widgets import Button, Digits, Footer, Header, Static, Label
+from textual.widgets import Button, Rule, Digits, Footer, Header, Static, Label
 
 class Shop(VerticalScroll):
 	"""The shop."""
@@ -47,7 +47,15 @@ class TuxbuxIdleGameApp(App):
 	CSS_PATH = "tuxbux.tcss"
 	TITLE = "Tuxbux"
 	SUB_TITLE = "An idle game in your terminal"
-
+	SHOPHEADER = """
+   ▄▄▄▄    ▄▄    ▄▄    ▄▄▄▄    ▄▄▄▄▄▄   
+ ▄█▀▀▀▀█   ██    ██   ██▀▀██   ██▀▀▀▀█▄ 
+ ██▄       ██    ██  ██    ██  ██    ██ 
+  ▀████▄   ████████  ██    ██  ██████▀  
+      ▀██  ██    ██  ██    ██  ██       
+ █▄▄▄▄▄█▀  ██    ██   ██▄▄██   ██       
+  ▀▀▀▀▀    ▀▀    ▀▀    ▀▀▀▀    ▀▀       
+"""
 	BINDINGS = [
 		("d", "toggle_dark", "Toggle dark mode"),
 	]
@@ -58,7 +66,10 @@ class TuxbuxIdleGameApp(App):
 		yield Footer()
 		yield Static("Tuxbux", classes="box")
 		yield Static("Hax0r Display", classes="box")
-		yield Shop(classes="box", id="shop")
+		with VerticalGroup(classes="box shop"):
+			yield Label(self.SHOPHEADER, id="label")
+			yield Rule(line_style="thick", id="rule")
+			yield Shop(id="shop")
 
 	def action_toggle_dark(self) -> None:
 		"""An action to toggle dark mode."""
