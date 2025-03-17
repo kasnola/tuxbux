@@ -5,6 +5,7 @@ from textual.app import App, ComposeResult
 from textual.content import Content
 from textual.containers import Middle, HorizontalGroup, VerticalGroup, VerticalScroll, Center
 from textual.reactive import reactive
+from textual.widget import Widget
 from textual.widgets import Button, Rule, Digits, Footer, Header, Static, Label
 
 class Shop(VerticalScroll):
@@ -14,13 +15,11 @@ class Shop(VerticalScroll):
 		"""Create child purchasables."""
 		yield Purchasable(name="Product 00", classes="purchasable", id="tuxminer")
 		yield Purchasable(name="Product 01", classes="purchasable", id="tuxminer2")
-		yield Purchasable(name="Product 02", classes="purchasable", id="tuxminer3")
-		yield Purchasable(name="Product 03", classes="purchasable", id="tuxminer4")
-		yield Purchasable(name="Product 04", classes="purchasable", id="tuxminer5")
-		yield Purchasable(name="Product 05", classes="purchasable", id="tuxminer6")
 
 class Purchasable(HorizontalGroup):
 	"""A purchasable widget."""
+
+	description = reactive("Sample description")
 
 	def on_mount(self) -> None:
 		self.border_title = self.name
@@ -32,18 +31,12 @@ class Purchasable(HorizontalGroup):
 
 	def compose(self) -> ComposeResult:
 		"""Create child widgets of a purchasable."""
-		yield VerticalGroup(
-			Label(
-				Content.from_markup("[bold]$name[/bold]", name=self.name),
-				id=self.id
-				),
-			classes="label"
-		)
-		yield Middle(Button("Buy", classes="button buy", id=self.id))
+		with VerticalGroup(classes="label"):
+			yield Label(self.description, id=self.id)
+		with Middle():
+			yield Button("Buy", classes="button buy", id=self.id)
 
 class TuxbuxIdleGameApp(App):
-	"""An idle game made with Textual."""
-
 	CSS_PATH = "tuxbux.tcss"
 	TITLE = "Tuxbux"
 	SUB_TITLE = "An idle game in your terminal"
@@ -58,6 +51,8 @@ class TuxbuxIdleGameApp(App):
 """
 	BINDINGS = [
 		("d", "toggle_dark", "Toggle dark mode"),
+		("a", "add_purchasable", "Add a purchasable"),
+		("r", "remove_purchasable", "Remove a purchasable"),
 	]
 
 	def compose(self) -> ComposeResult:
@@ -70,6 +65,21 @@ class TuxbuxIdleGameApp(App):
 			yield Label(self.SHOPHEADER, id="label")
 			yield Rule(line_style="thick", id="rule")
 			yield Shop(id="shop")
+
+	purchasable_index = 2
+
+	def action_add_purchasable(self) -> None:
+		purchasable_name = "Product " + str(self.purchasable_index).zfill(2)
+		new_purchasable = Purchasable(name=purchasable_name,classes="purchasable")
+		self.query_one("#shop").mount(new_purchasable)
+		new_purchasable.scroll_visible()
+		self.purchasable_index += 1
+
+	def action_remove_purchasable(self) -> None:
+		purchasables = self.query("Purchasable")
+		if purchasables:
+			purchasables.last().remove()
+			self.purchasable_index = max(0, self.purchasable_index - 1)
 
 	def action_toggle_dark(self) -> None:
 		"""An action to toggle dark mode."""
