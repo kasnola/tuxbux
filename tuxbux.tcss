@@ -2,20 +2,78 @@
 
 Screen {
 	layout: horizontal;
+	# layers: above middle below;
 }
+
+#icons {
+	layers: below above;
+	align: center middle;
+}
+
+#tux_icon {
+	content-align: center middle;
+	# text-align: center;
+	# border: solid yellow;
+	width: 1fr;
+	height: 1fr;
+	layer: above;
+}
+
+#dollar_icon {
+	content-align: center middle;
+	# border: solid yellow;
+	# height: 1fr;
+	layer: below;
+}
+
+.welcome {
+	&.label {
+		height: 4;
+		width: 100%;
+		text-align: center;
+	}
+	&.rule {
+		color: green;
+	}
+}
+
+.counter {
+	align: center middle;
+	&.digits {
+		content-align: center middle;
+		text-align: center;
+		height: 5;
+		width: 100%;
+	}
+}
+
 
 .box {
 	height: 100%;
 	width: 1fr;
 	border: solid green;
+	.label {
+		text-align: center;
+	}
+
+	&.counterpane {
+		border: panel green;
+	}
+
+	&.display {
+		width: 1.5fr;
+		border: solid blue;
+	}
+
 	&.shop {
+		width: 1fr;
 		border: solid yellow;
 		border: none;
 		#label {
 			# border: solid yellow;
 			# border: none;
 			# margin: 0;
-			height: 8;
+			height: 7;
 			width: 100%;
 			text-align: center;
 		}
@@ -43,12 +101,15 @@ Screen {
 	.label {
 		height: 100%;
 		width: 80%;
-		align: left top;
+		text-align: left;
 	}
 	.button {
 		height: 100%;
+		min-width: 9;
+		dock: right;
+		border: none;
 		text-align: center;
-		content-align: right middle;
+		content-align: center middle;
 		&.buy {
 			background: $success-muted;
 		}
