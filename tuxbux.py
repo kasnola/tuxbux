@@ -15,19 +15,13 @@ class Shop(VerticalScroll):
 
 	def compose(self) -> ComposeResult:
 		"""Create child purchasables."""
-		yield ShopEntry("Low-end VPS", description="TEST!", price=20)
-		# yield Purchasable(name="Low-end VPS", classes="purchasable", id="tuxminer")
-		# # 1x vCPU, 768MB RAM
-		# yield Purchasable(name="Mid-range VPS", classes="purchasable", id="tuxminer2")
-		# # 4x vCPU, 4096MB RAM
-		# yield Purchasable(name="High-end VPS", classes="purchasable")
-		# # 8x vCPU, 8192MB RAM, 1x vGPU
-		# yield Purchasable(name="Dedicated Server Box", classes="purchasable")
-		# yield Purchasable(name="Herd of Linux Boxen", classes="purchasable")
-		# # you paid a graybeard some serious cash to inherit one of his herds
-		# yield Purchasable(name="Cloud Compute Cluster", classes="purchasable")
-		# # let's make this like 100x pricier than CCC
-		# yield Purchasable(name="Hyperhypervisor", classes="purchasable")
+		yield ShopEntry("Low-tier VPS", color="red", description="You scroll through lowendbox.com and decide to humor yourself. Surely, a gigabyte of ram should do the trick.", price=20, priceMod=1, cps=1, isVisible=True)
+		yield ShopEntry("Mid-range VPS", color="orange", description="Hey, this one's got multiple cpu's!", price=250, priceMod=1, cps=8)
+		yield ShopEntry("High-end VPS", color="yellow", description="Tux's penguin wings give this VM a few extra TeraFLOPS.", price=1000, priceMod=1, cps=48)
+		yield ShopEntry("Dedicated Server Box", color="green", description="Nothing like a bare metal box to call home.", price=2500, priceMod=1, cps=256)
+		yield ShopEntry("Herd of Linux Boxen", color="blue", description="After much contemplation, a scrupulous graybeard had found you worthy to inherit his commendable fleet. With a hefty right price, of course.", price=69420, priceMod=1, cps=1234)
+		yield ShopEntry("Cloud Compute Cluster", color="indigo", description="Your data centers put Google and Amazon to shame.", price=250000, priceMod=1, cps=42069)
+		yield ShopEntry("Hyperhypervisor", color="darkviolet", description="A 25th century chip with simulated reality bubble included. An entire universe finely tuned and programmed to one purpose: to synthesize and output more Tuxbux.", price=1234567, priceMod=1, cps=99999)
 
 class TuxLogo(Static):
 	class Clicked(Message):
@@ -61,20 +55,16 @@ class TuxbuxCounter(Digits):
 # 	name="Hyperhypervisor", classes="purchasable"
 
 # shop related stuffs
-priceIncrease = 1.15
+priceIncrease = 1.35
 ShopEntries = {}
-ShopEntriesByID = []
-ShopEntriesID = 0
+ShopEntriesOwned = {}
 	
 class ShopEntry(Static):
-	def __init__(self, title, description="", price=0, cps=0, priceMod=1, buyFunction=False):
-		global ShopEntriesID
+	def __init__(self, title, color="white", description="", price=0, cps=0, priceMod=1, buyFunction=False, isVisible=False):
 		global ShopEntries
-		global ShopEntriesByID
-		self.shopId = ShopEntriesID
 
 		self.price = reactive(0)
-
+		self.color = color
 		self.priceMod = priceMod
 		self.title = title
 		self.description = description
@@ -89,10 +79,10 @@ class ShopEntry(Static):
 		self.cps = self.baseCps
 		self.cost = 0
 		self.amount = 0
+		self.isVisible = isVisible
 
 		ShopEntries[self.title] = self
-		ShopEntriesByID.append(self.shopId)
-		ShopEntriesID += 1
+		ShopEntriesOwned.update({self.title : 0})
 		super().__init__()
 
 	# @property
@@ -101,14 +91,16 @@ class ShopEntry(Static):
 		return math.ceil(price)
 
 	class Bought(Message):
-		def __init__(self, cost: int) -> None:
+		def __init__(self, cost: int, cps: int, entry: str) -> None:
 			self.cost = cost
+			self.entry = entry
+			self.cps = cps
 			super().__init__()
 
 	def buy(self, money):
 		price = self.getPrice()
 		if (money >= price):
-			self.post_message(self.Bought(price))
+			self.post_message(self.Bought(price, self.cps, self.title))
 			self.amount += 1
 			price = self.getPrice()
 			self.price = price
@@ -117,11 +109,22 @@ class ShopEntry(Static):
 	def on_mount(self):
 		# def update_label(price : int):
 		# 	self.query_one(Button).label = f"Buy (${price})"
-		
-		self.classes="purchasable"
+		def make_visible():
+			if (app.tuxbuxAmount >= self.basePrice):
+				self.isVisible = True
+				self.styles.visibility = "visible"
+		self.styles.border = ("outer", self.color)
+		self.classes=F"purchasable"
 		self.border_title = self.title
+		if (self.isVisible):
+			self.styles.visibility = "visible"
+		else:
+			self.styles.visibility = "hidden"
+		
+		self.log("basePrice is " + str(self.basePrice))
+		self.watch(app, "tuxbuxAmount", make_visible)
+		self.query_one(Button).label = f"Buy (${self.price})"
 
-		# self.watch(self, "price", update_label)
 
 
 	def compose(self) -> ComposeResult:
@@ -140,11 +143,15 @@ class ShopEntry(Static):
 		# self.log("button pressed @ " + str(button_id))
 
 class TuxbuxIdleGameApp(App):
+
+	start_time = reactive(monotonic)
+	current_time = reactive(0.0)
+
 	# see Cookie Clicker
 	tuxbuxAmount = reactive(0)
 	tuxbuxEarned : int # all tuxbux earned during gameplay
 	tuxbuxDisplay : int # tuxbux display
-	tuxbuxPerSecond : int # recalculate w/ every new purchase
+	tuxbuxPerSecond : int = 0 # recalculate w/ every new purchase
 	tuxbuxPerSecondRaw : int # this doesn't do anything atm
 	tuxbuxClicks : int = 0 # +1 for each click
 	
@@ -297,6 +304,13 @@ class TuxbuxIdleGameApp(App):
 			counter_value_fmt = "$" + str(counter_value)
 			self.query_one(TuxbuxCounter).update(value=counter_value_fmt)
 		self.watch(self, "tuxbuxAmount", update_counter)
+		self.set_interval(1, self.handle_cps)
+
+	def handle_cps(self) -> None:
+		app.tuxbuxAmount += app.tuxbuxPerSecond
+		self.current_time = monotonic() - self.start_time
+		self.log(app.tuxbuxPerSecond) 
+		self.log(self.current_time) 
 
 	def on_tux_logo_clicked(self, message: TuxLogo.Clicked) -> None:
 		self.tuxbuxAmount += 1
@@ -305,7 +319,11 @@ class TuxbuxIdleGameApp(App):
 
 	def on_shop_entry_bought(self, message: ShopEntry.Bought) -> None:
 		self.tuxbuxAmount -= max(0, message.cost)
-		self.log("I just shit myself.")
+		self.log(message.entry)
+		self.log(ShopEntries)
+		ShopEntriesOwned[message.entry] += 1
+		app.tuxbuxPerSecond += message.cps
+		self.log(ShopEntriesOwned[message.entry])
 
 if __name__ == "__main__":
 	app = TuxbuxIdleGameApp()
