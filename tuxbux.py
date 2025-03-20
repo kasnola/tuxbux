@@ -1,4 +1,12 @@
 import math
+import json
+import io
+import os
+import sys
+import platform
+import time
+
+from pathlib import Path
 from time import monotonic
 
 from textual import log, events
@@ -10,18 +18,49 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Input, Button, Rule, Digits, Footer, Header, Static, Label
 
+appStateDir = ""
+userHome = Path.home()
+
+if (platform.system() == "Windows"):
+	USRAPPDATA = os.getenv('LOCALAPPDATA')
+	appStateDir = f"{USRAPPDATA}/tuxbux"
+elif (platform.system() == "Linux"):
+	appStateDir = f"{userHome}/.local/state/tuxbux"
+
+SAVEPATH=f"{appStateDir}/savedata.json"
+
+if not ( os.path.isfile(SAVEPATH) ):
+	Path(SAVEPATH).touch()
+
+# write to $HOME/.local/state/tuxbux
+
+# with oepn(SAVEPATH, "r") as file_obj:
+# 	file_obj.seek(0, os.SEEK_END)
+
+# 	file_size = file_obj.tell()
+
+
+if SAVEPATH:
+	with open(SAVEPATH, "r") as openfile:
+		try:
+			LOADED_APP_SAVE_DATA = json.load(openfile)
+		except json.decoder.JSONDecodeError:
+			LOADED_APP_SAVE_DATA = {}
+else:
+	LOADED_APP_SAVE_DATA = {}
+
 class Shop(VerticalScroll):
 	"""The shop."""
 
 	def compose(self) -> ComposeResult:
 		"""Create child purchasables."""
-		yield ShopEntry("Low-tier VPS", color="red", description="You scroll through lowendbox.com and decide to humor yourself. Surely, a gigabyte of ram should do the trick.", price=20, priceMod=1, cps=1, isVisible=True)
-		yield ShopEntry("Mid-range VPS", color="orange", description="Hey, this one's got multiple cpu's!", price=250, priceMod=1, cps=8)
-		yield ShopEntry("High-end VPS", color="yellow", description="Tux's penguin wings give this VM a few extra TeraFLOPS.", price=1000, priceMod=1, cps=48)
-		yield ShopEntry("Dedicated Server Box", color="green", description="Nothing like a bare metal box to call home.", price=2500, priceMod=1, cps=256)
-		yield ShopEntry("Herd of Linux Boxen", color="blue", description="After much contemplation, a scrupulous graybeard had found you worthy to inherit his commendable fleet. With a hefty right price, of course.", price=69420, priceMod=1, cps=1234)
-		yield ShopEntry("Cloud Compute Cluster", color="indigo", description="Your data centers put Google and Amazon to shame.", price=250000, priceMod=1, cps=42069)
-		yield ShopEntry("Hyperhypervisor", color="darkviolet", description="A 25th century chip with simulated reality bubble included. An entire universe finely tuned and programmed to one purpose: to synthesize and output more Tuxbux.", price=1234567, priceMod=1, cps=99999)
+		yield ShopEntry("Low-tier VPS", shopID=1, color="red", description="You scroll through lowendbox.com and decide to humor yourself. Surely, a gigabyte of ram should do the trick.", price=20, priceMod=1, cps=1, isVisible=True)
+		yield ShopEntry("Mid-range VPS", shopID=2, color="orange", description="Hey, this one's got multiple cpu's!", price=250, priceMod=1, cps=8)
+		yield ShopEntry("High-end VPS", shopID=3, color="yellow", description="Tux's penguin wings give this VM a few extra TeraFLOPS.", price=1000, priceMod=1, cps=48)
+		yield ShopEntry("Dedicated Server Box", shopID=4, color="green", description="Nothing like a bare metal box to call home.", price=2500, priceMod=1, cps=256)
+		yield ShopEntry("Herd of Linux Boxen", shopID=5, color="blue", description="After much contemplation, a scrupulous graybeard had found you worthy to inherit his commendable fleet. With a hefty right price, of course.", price=69420, priceMod=1, cps=1234)
+		yield ShopEntry("Cloud Compute Cluster", shopID=6, color="indigo", description="Your data centers put Google and Amazon to shame.", price=250000, priceMod=1, cps=42069)
+		yield ShopEntry("Hyperhypervisor", shopID=7, color="darkviolet", description="A 25th century chip with simulated reality bubble included. An entire universe finely tuned and programmed to one purpose: to synthesize and output more Tuxbux.", price=1234567, priceMod=1, cps=99999)
 
 class TuxLogo(Static):
 	class Clicked(Message):
@@ -38,31 +77,18 @@ class TuxbuxCounter(Digits):
 	def watch_tuxbux_counter(self, counter_value: int):
 		self.value = "$" + str(counter_value)
 
-		
-
-# class ShopEntries:
-# 	name="Low-end VPS", classes="purchasable", id="tuxminer"
-# 	# 1x vCPU, 768MB RAM
-# 	name="Mid-range VPS", classes="purchasable", id="tuxminer2"
-# 	# 4x vCPU, 4096MB RAM
-# 	name="High-end VPS", classes="purchasable"
-# 	# 8x vCPU, 8192MB RAM, 1x vGPU
-# 	name="Dedicated Server Box", classes="purchasable"
-# 	name="Herd of Linux Boxen", classes="purchasable"
-# 	# you paid a graybeard some serious cash to inherit one of his herds
-# 	name="Cloud Compute Cluster", classes="purchasable"
-# 	# let's make this like 100x pricier than CCC
-# 	name="Hyperhypervisor", classes="purchasable"
-
 # shop related stuffs
 priceIncrease = 1.35
 ShopEntries = {}
 ShopEntriesOwned = {}
 	
 class ShopEntry(Static):
-	def __init__(self, title, color="white", description="", price=0, cps=0, priceMod=1, buyFunction=False, isVisible=False):
+	def __init__(self, title, shopID=-1, color="white", description="", price=0, cps=0, priceMod=1, buyFunction=False, isVisible=False):
 		global ShopEntries
 
+		self.shopID = shopID
+
+		
 		self.price = reactive(0)
 		self.color = color
 		self.priceMod = priceMod
@@ -83,6 +109,9 @@ class ShopEntry(Static):
 
 		ShopEntries[self.title] = self
 		ShopEntriesOwned.update({self.title : 0})
+
+		if not (LOADED_APP_SAVE_DATA == {}) and not (LOADED_APP_SAVE_DATA[f"ENTRY_{shopID}_PRICE"] == -1):
+			self.price = LOADED_APP_SAVE_DATA[f"ENTRY_{shopID}_PRICE"]
 		super().__init__()
 
 	# @property
@@ -96,6 +125,11 @@ class ShopEntry(Static):
 			self.entry = entry
 			self.cps = cps
 			super().__init__()
+	class NewPrice(Message):
+		def __init__(self, price: int, shopID: int) -> None:
+			self.price = price
+			self.shopID = shopID
+			super().__init__()
 
 	def buy(self, money):
 		price = self.getPrice()
@@ -104,6 +138,7 @@ class ShopEntry(Static):
 			self.amount += 1
 			price = self.getPrice()
 			self.price = price
+			self.post_message(self.NewPrice(price, self.shopID))
 			if (self.buyFunction): self.buyFunction()
 	
 	def on_mount(self):
@@ -121,7 +156,6 @@ class ShopEntry(Static):
 		else:
 			self.styles.visibility = "hidden"
 		
-		self.log("basePrice is " + str(self.basePrice))
 		self.watch(app, "tuxbuxAmount", make_visible)
 		self.query_one(Button).label = f"Buy (${self.price})"
 
@@ -134,18 +168,17 @@ class ShopEntry(Static):
 
 	def on_button_pressed(self, event: Button.Pressed) -> None:
 		"""Event handler called when a button is pressed."""
-		button_id = event.button.id
-		# self.log(self)
-		self.log("price is " + str(self.getPrice()))
-		# self.log(app.tuxbuxAmount)
+		# button_id = event.button.id
 		self.buy(app.tuxbuxAmount)
 		self.query_one(Button).label = f"Buy (${self.price})"
-		# self.log("button pressed @ " + str(button_id))
 
 class TuxbuxIdleGameApp(App):
 
+	app_save_data = {}
 	start_time = reactive(monotonic)
 	current_time = reactive(0.0)
+	current_day_time = 0.0
+	last_open_time = 0.0
 
 	# see Cookie Clicker
 	tuxbuxAmount = reactive(0)
@@ -155,6 +188,13 @@ class TuxbuxIdleGameApp(App):
 	tuxbuxPerSecondRaw : int # this doesn't do anything atm
 	tuxbuxClicks : int = 0 # +1 for each click
 	
+	ENTRY_1_PRICE = -1
+	ENTRY_2_PRICE = -1
+	ENTRY_3_PRICE = -1
+	ENTRY_4_PRICE = -1
+	ENTRY_5_PRICE = -1
+	ENTRY_6_PRICE = -1
+	ENTRY_7_PRICE = -1
 
 	#main.js:3331 compute cookies earned while game was closed
 	CSS_PATH = "tuxbux.tcss"
@@ -255,8 +295,6 @@ class TuxbuxIdleGameApp(App):
 """
 	BINDINGS = [
 		("d", "toggle_dark", "Toggle dark mode"),
-		("a", "add_purchasable", "Add a purchasable"),
-		("r", "remove_purchasable", "Remove a purchasable"),
 	]
 
 	def compose(self) -> ComposeResult:
@@ -287,11 +325,7 @@ class TuxbuxIdleGameApp(App):
 		self.tuxbuxPerSecond = 0
 
 	# def action_add_purchasable(self) -> None:
-	# 	purchasable_name = "Product " + str(self.purchasable_index).zfill(2)
-	# 	new_purchasable = Purchasable(name=purchasable_name,classes="purchasable")
-	# 	self.query_one("#shop").mount(new_purchasable)
-	# 	new_purchasable.scroll_visible()
-	# 	self.purchasable_index += 1
+	# 	app.write_save()
 
 	# def action_remove_purchasable(self) -> None:
 	# 	purchasables = self.query("Purchasable")
@@ -305,25 +339,48 @@ class TuxbuxIdleGameApp(App):
 			self.query_one(TuxbuxCounter).update(value=counter_value_fmt)
 		self.watch(self, "tuxbuxAmount", update_counter)
 		self.set_interval(1, self.handle_cps)
+		self.set_interval(60, app.write_save) # let's try to write a save every minute
+
+	def on_load(self):
+		if not (LOADED_APP_SAVE_DATA == {}):
+			app.tuxbuxAmount = LOADED_APP_SAVE_DATA["TUXBUX_AMOUNT"]
+			app.tuxbuxPerSecond = LOADED_APP_SAVE_DATA["TUXBUX_PER_SECOND"]
+			timeDiff = int(time.time()) - LOADED_APP_SAVE_DATA["TIME_LAST_OPEN"]
+			app.tuxbuxAmount += int( max(0, ((timeDiff / 10) * app.tuxbuxPerSecond)) )
+			for i in range(1,8):
+				if not (f"ENTRY_{i}_PRICE" in LOADED_APP_SAVE_DATA): 
+					LOADED_APP_SAVE_DATA[f"ENTRY_{i}_PRICE"] = -1
+				# self.log(LOADED_APP_SAVE_DATA[f"ENTRY_{i}_PRICE"])
+	def write_save(self) -> None:
+		app.current_day_time = time.time()
+		app.app_save_data.update({"TIME_LAST_OPEN" : int(app.current_day_time)})
+		app.app_save_data.update({"TUXBUX_AMOUNT" : int(app.tuxbuxAmount)})
+		app.app_save_data.update({"TUXBUX_CLICKS" : int(app.tuxbuxClicks)})
+		app.app_save_data.update({"TUXBUX_PER_SECOND" : int(self.tuxbuxPerSecond)})
+		app_save_data_json = json.dumps(app.app_save_data, indent=4)
+		with open(SAVEPATH, "w") as outfile:
+			outfile.write(app_save_data_json)
+		pass
 
 	def handle_cps(self) -> None:
 		app.tuxbuxAmount += app.tuxbuxPerSecond
 		self.current_time = monotonic() - self.start_time
-		self.log(app.tuxbuxPerSecond) 
-		self.log(self.current_time) 
+		# self.log(app.tuxbuxPerSecond) 
+		# self.log(self.current_time) 
+		self.query_one
 
 	def on_tux_logo_clicked(self, message: TuxLogo.Clicked) -> None:
 		self.tuxbuxAmount += 1
 		self.tuxbuxClicks += 1
-		self.log(message)
 
 	def on_shop_entry_bought(self, message: ShopEntry.Bought) -> None:
 		self.tuxbuxAmount -= max(0, message.cost)
-		self.log(message.entry)
-		self.log(ShopEntries)
+		# self.log(ShopEntries)
 		ShopEntriesOwned[message.entry] += 1
 		app.tuxbuxPerSecond += message.cps
-		self.log(ShopEntriesOwned[message.entry])
+
+	def on_shop_entry_new_price(self, message:ShopEntry.NewPrice) -> None:
+		app.app_save_data.update({f"ENTRY_{message.shopID}_PRICE" : message.price})
 
 if __name__ == "__main__":
 	app = TuxbuxIdleGameApp()
