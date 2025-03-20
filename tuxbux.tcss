@@ -63,6 +63,7 @@ Screen {
 	&.display {
 		width: 1.5fr;
 		border: solid blue;
+		content-align: center middle;
 	}
 
 	&.shop {
@@ -104,10 +105,11 @@ Screen {
 		text-align: left;
 	}
 	.button {
-		height: 100%;
-		min-width: 9;
+		height: 1fr;
+		# width: 4;
+		min-width: 11;
 		dock: right;
-		border: none;
+		# border: solid red;
 		text-align: center;
 		content-align: center middle;
 		&.buy {
