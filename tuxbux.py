@@ -15,7 +15,7 @@ class Shop(VerticalScroll):
 
 	def compose(self) -> ComposeResult:
 		"""Create child purchasables."""
-		yield ShopEntry("Low-end VPS", description="TEST!")
+		yield ShopEntry("Low-end VPS", description="TEST!", price=20)
 		# yield Purchasable(name="Low-end VPS", classes="purchasable", id="tuxminer")
 		# # 1x vCPU, 768MB RAM
 		# yield Purchasable(name="Mid-range VPS", classes="purchasable", id="tuxminer2")
@@ -67,16 +67,21 @@ ShopEntriesByID = []
 ShopEntriesID = 0
 	
 class ShopEntry(Static):
-	def __init__(self, title, description="", price=0, cps=0, buyFunction=False):
+	def __init__(self, title, description="", price=0, cps=0, priceMod=1, buyFunction=False):
 		global ShopEntriesID
 		global ShopEntries
 		global ShopEntriesByID
 		self.shopId = ShopEntriesID
 
+		self.price = reactive(0)
+
+		self.priceMod = priceMod
 		self.title = title
 		self.description = description
-		if (buyFunction): self.buyFunction = buyFunction
-
+		if (buyFunction):
+			self.buyFunction = buyFunction
+		else:
+			self.buyFunction = False
 		self.basePrice = price
 		self.baseCps = cps
 
@@ -92,7 +97,7 @@ class ShopEntry(Static):
 
 	# @property
 	def getPrice(self):
-		price = self.basePrice * (priceIncrease ** max(0, self.amount))
+		price = self.basePrice * (priceIncrease ** max(0, self.amount) * self.priceMod)
 		return math.ceil(price)
 
 	class Bought(Message):
@@ -110,8 +115,14 @@ class ShopEntry(Static):
 			if (self.buyFunction): self.buyFunction()
 	
 	def on_mount(self):
+		# def update_label(price : int):
+		# 	self.query_one(Button).label = f"Buy (${price})"
+		
 		self.classes="purchasable"
 		self.border_title = self.title
+
+		# self.watch(self, "price", update_label)
+
 
 	def compose(self) -> ComposeResult:
 		with HorizontalGroup():
@@ -123,7 +134,9 @@ class ShopEntry(Static):
 		button_id = event.button.id
 		# self.log(self)
 		self.log("price is " + str(self.getPrice()))
-		self.post_message(self.Bought(1))
+		# self.log(app.tuxbuxAmount)
+		self.buy(app.tuxbuxAmount)
+		self.query_one(Button).label = f"Buy (${self.price})"
 		# self.log("button pressed @ " + str(button_id))
 
 class TuxbuxIdleGameApp(App):
@@ -256,8 +269,6 @@ class TuxbuxIdleGameApp(App):
 			yield Rule(line_style="thick", id="rule")
 			yield Shop(id="shop")
 
-	purchasable_index = 2
-
 	def tuxbux_earn(self, howmuch) -> None:
 		self.tuxbuxAmount += howmuch
 		self.tuxbuxEarned += howmuch 
@@ -268,19 +279,18 @@ class TuxbuxIdleGameApp(App):
 	def tuxbux_calculate_gains(self) -> None:
 		self.tuxbuxPerSecond = 0
 
+	# def action_add_purchasable(self) -> None:
+	# 	purchasable_name = "Product " + str(self.purchasable_index).zfill(2)
+	# 	new_purchasable = Purchasable(name=purchasable_name,classes="purchasable")
+	# 	self.query_one("#shop").mount(new_purchasable)
+	# 	new_purchasable.scroll_visible()
+	# 	self.purchasable_index += 1
 
-	def action_add_purchasable(self) -> None:
-		purchasable_name = "Product " + str(self.purchasable_index).zfill(2)
-		new_purchasable = Purchasable(name=purchasable_name,classes="purchasable")
-		self.query_one("#shop").mount(new_purchasable)
-		new_purchasable.scroll_visible()
-		self.purchasable_index += 1
-
-	def action_remove_purchasable(self) -> None:
-		purchasables = self.query("Purchasable")
-		if purchasables:
-			purchasables.last().remove()
-			self.purchasable_index = max(0, self.purchasable_index - 1)
+	# def action_remove_purchasable(self) -> None:
+	# 	purchasables = self.query("Purchasable")
+	# 	if purchasables:
+	# 		purchasables.last().remove()
+	# 		self.purchasable_index = max(0, self.purchasable_index - 1)
 
 	def on_mount(self):
 		def update_counter(counter_value : int):
@@ -294,6 +304,7 @@ class TuxbuxIdleGameApp(App):
 		self.log(message)
 
 	def on_shop_entry_bought(self, message: ShopEntry.Bought) -> None:
+		self.tuxbuxAmount -= max(0, message.cost)
 		self.log("I just shit myself.")
 
 if __name__ == "__main__":
