@@ -70,9 +70,9 @@ class Shop(VerticalScroll):
 
 	def compose(self) -> ComposeResult:
 		"""Create child purchasables."""
-		yield ShopEntry("Low-tier VPS", shopID=1, color="red", description="You scroll through lowendbox.com and decide to humor yourself. Surely, a gigabyte of ram should do the trick.", price=20, priceMod=1, cps=1, isVisible=True)
+		yield ShopEntry("Low-tier VPS", shopID=1, color="red", description="You scroll through lowendbox.com and decide to humor yourself. Surely, a gigabyte of ram should do the trick.", price=12, priceMod=1, cps=1, isVisible=True)
 		yield ShopEntry("Mid-range VPS", shopID=2, color="orange", description="Hey, this one's got multiple cpu's!", price=250, priceMod=1, cps=8)
-		yield ShopEntry("High-end VPS", shopID=3, color="yellow", description="Tux's penguin wings give this VM a few extra TeraFLOPS.", price=1000, priceMod=1, cps=48)
+		yield ShopEntry("High-end VPS", shopID=3, color="yellow", description="Tux's penguin wings give this VM a few extra TeraFLOPS.", price=1000, priceMod=1, cps=72)
 		yield ShopEntry("Dedicated Server Box", shopID=4, color="green", description="Nothing like a bare metal box to call home.", price=2500, priceMod=1, cps=256)
 		yield ShopEntry("Herd of Linux Boxen", shopID=5, color="blue", description="After much contemplation, a scrupulous graybeard had found you worthy to inherit his commendable fleet. With a hefty right price, of course.", price=69420, priceMod=1, cps=1234)
 		yield ShopEntry("Cloud Compute Cluster", shopID=6, color="indigo", description="Your data centers put Google and Amazon to shame.", price=250000, priceMod=1, cps=42069)
@@ -103,7 +103,6 @@ class ShopEntry(Static):
 		global ShopEntries
 
 		self.shopID = shopID
-
 		
 		self.price = reactive(0)
 		self.color = color
@@ -128,6 +127,7 @@ class ShopEntry(Static):
 
 		if not (LOADED_APP_SAVE_DATA == {}) and not (LOADED_APP_SAVE_DATA[f"ENTRY_{shopID}_PRICE"] == -1):
 			self.price = LOADED_APP_SAVE_DATA[f"ENTRY_{shopID}_PRICE"]
+			self.basePrice = LOADED_APP_SAVE_DATA[f"ENTRY_{shopID}_PRICE"]
 		super().__init__()
 
 	# @property
@@ -160,19 +160,21 @@ class ShopEntry(Static):
 	def on_mount(self):
 		# def update_label(price : int):
 		# 	self.query_one(Button).label = f"Buy (${price})"
-		def make_visible():
-			if (app.tuxbuxAmount >= self.basePrice):
+		def make_visible(best):
+			if (best >= self.basePrice):
 				self.isVisible = True
 				self.styles.visibility = "visible"
+		
 		self.styles.border = ("outer", self.color)
 		self.classes=F"purchasable"
 		self.border_title = self.title
+		
 		if (self.isVisible):
 			self.styles.visibility = "visible"
 		else:
 			self.styles.visibility = "hidden"
 		
-		self.watch(app, "tuxbuxAmount", make_visible)
+		self.watch(app, "tuxbuxBestAmount", make_visible)
 		self.query_one(Button).label = f"Buy (${self.price})"
 
 
@@ -198,7 +200,9 @@ class TuxbuxIdleGameApp(App):
 
 	# see Cookie Clicker
 	tuxbuxAmount = reactive(0)
-	tuxbuxEarned : int # all tuxbux earned during gameplay
+	tuxbuxBestAmount = reactive(0) # highest amt of tuxbux Ever
+	tuxbuxEarned = reactive(0) # all tuxbux earned during gameplay
+
 	tuxbuxDisplay : int # tuxbux display
 	tuxbuxPerSecond : int = 0 # recalculate w/ every new purchase
 	tuxbuxPerSecondRaw : int # this doesn't do anything atm
@@ -331,13 +335,6 @@ class TuxbuxIdleGameApp(App):
 			yield Rule(line_style="thick", id="rule")
 			yield Shop(id="shop")
 
-	def tuxbux_earn(self, howmuch) -> None:
-		self.tuxbuxAmount += howmuch
-		self.tuxbuxEarned += howmuch 
-	
-	def tuxbux_spend(self, howmuch) -> None:
-		self.tuxbuxAmount -= howmuch
-	
 	def tuxbux_calculate_gains(self) -> None:
 		self.tuxbuxPerSecond = 0
 
@@ -346,44 +343,68 @@ class TuxbuxIdleGameApp(App):
 
 	def on_mount(self):
 		if not CANSAVE:
-			app.notify(f"Failed to access {SAVEPATH}.", title="Failed Load Save", severity="warning", timeout=10)
+			app.notify(f"Failed to access {SAVEPATH}.", title="Failed Load Save", severity="warning", timeout=12)
+
 		def update_counter(counter_value : int):
 			counter_value_fmt = "$" + str(counter_value)
 			self.query_one(TuxbuxCounter).update(value=counter_value_fmt)
+
+		def track_tuxbux_amount(tuxbuxAmount):
+			if tuxbuxAmount > app.tuxbuxBestAmount:
+				app.tuxbuxBestAmount = tuxbuxAmount
+
+
 		self.watch(self, "tuxbuxAmount", update_counter)
+		self.watch(self, "tuxbuxAmount", track_tuxbux_amount)
+
 		self.set_interval(1, self.handle_cps)
 		self.set_interval(60, app.write_save) # let's try to write a save every minute
 
 	def on_load(self):
 		if not (LOADED_APP_SAVE_DATA == {}):
 			app.tuxbuxAmount = LOADED_APP_SAVE_DATA["TUXBUX_AMOUNT"]
+			app.tuxbuxBestAmount = LOADED_APP_SAVE_DATA["TUXBUX_BEST_AMOUNT"]
 			app.tuxbuxPerSecond = LOADED_APP_SAVE_DATA["TUXBUX_PER_SECOND"]
 			timeDiff = int(time.time()) - LOADED_APP_SAVE_DATA["TIME_LAST_OPEN"]
 			app.tuxbuxAmount += int( max(0, ((timeDiff / 10) * app.tuxbuxPerSecond)) )
+			self.log(LOADED_APP_SAVE_DATA)
 			for i in range(1,8):
-				if not (f"ENTRY_{i}_PRICE" in LOADED_APP_SAVE_DATA): 
+				if (f"ENTRY_{i}_PRICE" in LOADED_APP_SAVE_DATA): 
+					self.log(LOADED_APP_SAVE_DATA[f"ENTRY_{i}_PRICE"])
+				else:
 					LOADED_APP_SAVE_DATA[f"ENTRY_{i}_PRICE"] = -1
 				# self.log(LOADED_APP_SAVE_DATA[f"ENTRY_{i}_PRICE"])
+
 	def write_save(self) -> None:
 		if SAVEPATH and CANSAVE:
 			app.current_day_time = time.time()
+
 			app.app_save_data.update({"TIME_LAST_OPEN" : int(app.current_day_time)})
 			app.app_save_data.update({"TUXBUX_AMOUNT" : int(app.tuxbuxAmount)})
+			app.app_save_data.update({"TUXBUX_BEST_AMOUNT" : int(app.tuxbuxBestAmount)})
 			app.app_save_data.update({"TUXBUX_CLICKS" : int(app.tuxbuxClicks)})
 			app.app_save_data.update({"TUXBUX_PER_SECOND" : int(self.tuxbuxPerSecond)})
+
+			for i in range(1,8):
+				if (f"ENTRY_{i}_PRICE" in LOADED_APP_SAVE_DATA): 
+					app.app_save_data.update({f"ENTRY_{i}_PRICE" : LOADED_APP_SAVE_DATA[f"ENTRY_{i}_PRICE"]})
+
 			app_save_data_json = json.dumps(app.app_save_data, indent=4)
+
 			with open(SAVEPATH, "w") as outfile:
 				outfile.write(app_save_data_json)
 			pass
+
+			app.notify(f"Succesfully saved to {SAVEPATH}", title="Save succeeded", severity="information", timeout=3)
 		else:
-			app.notify(f"Failed to write to {SAVEPATH}", title="Failed Write Save", severity="warning", timeout=10)
+			app.notify(f"Failed to write to {SAVEPATH}", title="Failed Write Save", severity="warning", timeout=12)
 
 	def handle_cps(self) -> None:
 		app.tuxbuxAmount += app.tuxbuxPerSecond
 		self.current_time = monotonic() - self.start_time
 		# self.log(app.tuxbuxPerSecond) 
 		# self.log(self.current_time) 
-		self.query_one
+		# self.query_one
 
 	def on_tux_logo_clicked(self, message: TuxLogo.Clicked) -> None:
 		self.tuxbuxAmount += 1
