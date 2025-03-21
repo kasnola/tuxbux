@@ -20,27 +20,43 @@ from textual.widgets import Input, Button, Rule, Digits, Footer, Header, Static,
 
 appStateDir = ""
 userHome = Path.home()
+CANSAVE = False
 
 if (platform.system() == "Windows"):
 	USRAPPDATA = os.getenv('LOCALAPPDATA')
 	appStateDir = f"{USRAPPDATA}/tuxbux"
 elif (platform.system() == "Linux"):
 	appStateDir = f"{userHome}/.local/state/tuxbux"
+else:
+	appStateDir = ""
 
-SAVEPATH=f"{appStateDir}/savedata.json"
+if appStateDir and not ( os.access(appStateDir, os.F_OK) ):
+	try:
+		os.mkdir(appStateDir)
+	except OSError:
+		appStateDir = ""
 
-if not ( os.path.isfile(SAVEPATH) ):
-	Path(SAVEPATH).touch()
+if appStateDir:
+	# try:
+	# 	os.access(appStateDir, os.R_OK)
+	SAVEPATH=f"{appStateDir}/savedata.json"
+else:
+	SAVEPATH = ""
 
-# write to $HOME/.local/state/tuxbux
-
-# with oepn(SAVEPATH, "r") as file_obj:
-# 	file_obj.seek(0, os.SEEK_END)
-
-# 	file_size = file_obj.tell()
-
+if SAVEPATH and appStateDir:
+	try:
+		Path(SAVEPATH).touch()
+	except OSError as error:
+		print(error)
 
 if SAVEPATH:
+	try:
+		with open(SAVEPATH, "r") as file:
+			CANSAVE = True
+	except OSError:
+			CANSAVE = False
+
+if SAVEPATH and CANSAVE:
 	with open(SAVEPATH, "r") as openfile:
 		try:
 			LOADED_APP_SAVE_DATA = json.load(openfile)
@@ -295,6 +311,7 @@ class TuxbuxIdleGameApp(App):
 """
 	BINDINGS = [
 		("d", "toggle_dark", "Toggle dark mode"),
+		("w", "add_purchasable", "Write save"),
 	]
 
 	def compose(self) -> ComposeResult:
@@ -324,16 +341,12 @@ class TuxbuxIdleGameApp(App):
 	def tuxbux_calculate_gains(self) -> None:
 		self.tuxbuxPerSecond = 0
 
-	# def action_add_purchasable(self) -> None:
-	# 	app.write_save()
-
-	# def action_remove_purchasable(self) -> None:
-	# 	purchasables = self.query("Purchasable")
-	# 	if purchasables:
-	# 		purchasables.last().remove()
-	# 		self.purchasable_index = max(0, self.purchasable_index - 1)
+	def action_add_purchasable(self) -> None:
+		app.write_save()
 
 	def on_mount(self):
+		if not CANSAVE:
+			app.notify(f"Failed to access {SAVEPATH}.", title="Failed Load Save", severity="warning", timeout=10)
 		def update_counter(counter_value : int):
 			counter_value_fmt = "$" + str(counter_value)
 			self.query_one(TuxbuxCounter).update(value=counter_value_fmt)
@@ -352,15 +365,18 @@ class TuxbuxIdleGameApp(App):
 					LOADED_APP_SAVE_DATA[f"ENTRY_{i}_PRICE"] = -1
 				# self.log(LOADED_APP_SAVE_DATA[f"ENTRY_{i}_PRICE"])
 	def write_save(self) -> None:
-		app.current_day_time = time.time()
-		app.app_save_data.update({"TIME_LAST_OPEN" : int(app.current_day_time)})
-		app.app_save_data.update({"TUXBUX_AMOUNT" : int(app.tuxbuxAmount)})
-		app.app_save_data.update({"TUXBUX_CLICKS" : int(app.tuxbuxClicks)})
-		app.app_save_data.update({"TUXBUX_PER_SECOND" : int(self.tuxbuxPerSecond)})
-		app_save_data_json = json.dumps(app.app_save_data, indent=4)
-		with open(SAVEPATH, "w") as outfile:
-			outfile.write(app_save_data_json)
-		pass
+		if SAVEPATH and CANSAVE:
+			app.current_day_time = time.time()
+			app.app_save_data.update({"TIME_LAST_OPEN" : int(app.current_day_time)})
+			app.app_save_data.update({"TUXBUX_AMOUNT" : int(app.tuxbuxAmount)})
+			app.app_save_data.update({"TUXBUX_CLICKS" : int(app.tuxbuxClicks)})
+			app.app_save_data.update({"TUXBUX_PER_SECOND" : int(self.tuxbuxPerSecond)})
+			app_save_data_json = json.dumps(app.app_save_data, indent=4)
+			with open(SAVEPATH, "w") as outfile:
+				outfile.write(app_save_data_json)
+			pass
+		else:
+			app.notify(f"Failed to write to {SAVEPATH}", title="Failed Write Save", severity="warning", timeout=10)
 
 	def handle_cps(self) -> None:
 		app.tuxbuxAmount += app.tuxbuxPerSecond
